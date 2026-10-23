@@ -47,7 +47,7 @@ struct StyleView: View {
                         Text("“\(example.said)”").foregroundStyle(.secondary)
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Murmur writes").font(.caption).foregroundStyle(.secondary)
+                        Text("Echo writes").font(.caption).foregroundStyle(.secondary)
                         Text(example.written).textSelection(.enabled)
                     }
                 }

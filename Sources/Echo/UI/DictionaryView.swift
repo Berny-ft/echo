@@ -51,7 +51,7 @@ struct DictionaryView: View {
             } header: {
                 Text("Replacements")
             } footer: {
-                Text("When you say the phrase on the left, Murmur writes the text on the right.")
+                Text("When you say the phrase on the left, Echo writes the text on the right.")
                     .foregroundStyle(.secondary)
             }
         }

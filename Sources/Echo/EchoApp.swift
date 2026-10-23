@@ -1,13 +1,13 @@
 import AppKit
 import SwiftUI
 
-struct MurmurApp: App {
+struct EchoApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var controller = AppDelegate.controller
     @StateObject private var prefs = Preferences.shared
 
     var body: some Scene {
-        Window("Murmur", id: "main") {
+        Window("Echo", id: "main") {
             MainView()
                 .environmentObject(controller)
                 .environmentObject(prefs)
@@ -76,7 +76,7 @@ struct MenuBarContent: View {
 
         Divider()
 
-        Button("Open Murmur") {
+        Button("Open Echo") {
             openWindow(id: "main")
             NSApp.activate()
         }
@@ -84,7 +84,7 @@ struct MenuBarContent: View {
 
         Divider()
 
-        Button("Quit Murmur") { NSApp.terminate(nil) }
+        Button("Quit Echo") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 }

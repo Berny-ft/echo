@@ -3,7 +3,7 @@ import SwiftUI
 import AVFoundation
 import Foundation
 
-// `Murmur --selftest <audio file>` runs the transcribe → format pipeline headlessly and prints the results.
+// `Echo --selftest <audio file>` runs the transcribe → format pipeline headlessly and prints the results.
 if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--selftest" {
     let path = CommandLine.arguments[2]
     Task { @MainActor in
@@ -22,7 +22,7 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--selftest" {
     let dir = URL(fileURLWithPath: CommandLine.arguments[2])
     MainActor.assumeIsolated { SelfTest.renderOverlay(to: dir) }
 } else {
-    MurmurApp.main()
+    EchoApp.main()
 }
 
 @MainActor
@@ -46,7 +46,7 @@ enum SelfTest {
 
         for engine in [FormatEngine.rules, .apple, .ollama] {
             for style in [FormatStyle.smart, .notes, .email] {
-                let ctx = TextFormatter.Context(style: style, appName: nil, bundleID: nil, vocabulary: ["Murmur"], replacements: [])
+                let ctx = TextFormatter.Context(style: style, appName: nil, bundleID: nil, vocabulary: ["Echo"], replacements: [])
                 let t2 = Date()
                 let out = await TextFormatter.format(raw, engine: engine, ollamaModel: prefs.ollamaModel, context: ctx)
                 print(String(format: "\n── %@ / %@ [%@] (%.2fs)\n%@", engine.title, style.title, out.engineUsed, Date().timeIntervalSince(t2), out.text))

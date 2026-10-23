@@ -1,4 +1,4 @@
-// Renders the Murmur app icon into an .iconset folder. Usage: swift make_icon.swift <out.iconset>
+// Renders the Echo app icon into an .iconset folder. Usage: swift make_icon.swift <out.iconset>
 import AppKit
 
 let out = URL(fileURLWithPath: CommandLine.arguments[1])

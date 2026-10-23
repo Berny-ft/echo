@@ -5,15 +5,15 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>Murmur</string>
+    <string>Echo</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.murmur.dictation</string>
+    <string>com.echo.dictation</string>
     <key>CFBundleName</key>
-    <string>Murmur</string>
+    <string>Echo</string>
     <key>CFBundleDisplayName</key>
-    <string>Murmur</string>
+    <string>Echo</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -27,8 +27,8 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Murmur listens while you hold the dictation key and transcribes your voice on this Mac.</string>
+    <string>Echo listens while you hold the dictation key and transcribes your voice on this Mac.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Murmur pastes dictated text into the app you're using.</string>
+    <string>Echo pastes dictated text into the app you're using.</string>
 </dict>
 </plist>

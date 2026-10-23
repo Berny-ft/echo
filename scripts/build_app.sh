@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds Murmur.app into ./build. Pass --install to copy it to /Applications and launch it.
+# Builds Echo.app into ./build. Pass --install to copy it to /Applications and launch it.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$ROOT/build/Murmur.app"
+APP="$ROOT/build/Echo.app"
 cd "$ROOT"
 
 echo "▸ Compiling (release)…"
@@ -13,7 +13,7 @@ BIN="$(swift build -c release --show-bin-path)"
 echo "▸ Assembling bundle…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/Murmur" "$APP/Contents/MacOS/Murmur"
+cp "$BIN/Echo" "$APP/Contents/MacOS/Echo"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 # SwiftPM resource bundles from dependencies, if any.
 find "$BIN" -maxdepth 1 -name "*.bundle" -exec cp -R {} "$APP/Contents/Resources/" \;
@@ -28,14 +28,14 @@ fi
 cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 echo "▸ Signing (ad-hoc)…"
-codesign --force --deep --sign - --identifier com.murmur.dictation "$APP"
+codesign --force --deep --sign - --identifier com.echo.dictation "$APP"
 
 echo "✓ Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then
-  pkill -x Murmur 2>/dev/null || true
-  rm -rf /Applications/Murmur.app
-  cp -R "$APP" /Applications/Murmur.app
-  echo "✓ Installed to /Applications/Murmur.app"
-  open /Applications/Murmur.app
+  pkill -x Echo 2>/dev/null || true
+  rm -rf /Applications/Echo.app
+  cp -R "$APP" /Applications/Echo.app
+  echo "✓ Installed to /Applications/Echo.app"
+  open /Applications/Echo.app
 fi

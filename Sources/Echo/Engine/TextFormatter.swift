@@ -177,7 +177,7 @@ struct TextFormatter {
     }
 
     private static func runApple(instructions: String, prompt: String) async throws -> String {
-        guard appleModelAvailable else { throw MurmurError.formatter(appleModelStatus) }
+        guard appleModelAvailable else { throw EchoError.formatter(appleModelStatus) }
         let session = LanguageModelSession(instructions: instructions)
         let response = try await session.respond(to: prompt, options: GenerationOptions(temperature: 0.2))
         return response.content
@@ -201,12 +201,12 @@ struct TextFormatter {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw MurmurError.formatter("Ollama returned an error. Is the model pulled?")
+            throw EchoError.formatter("Ollama returned an error. Is the model pulled?")
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let message = json["message"] as? [String: Any],
               let content = message["content"] as? String else {
-            throw MurmurError.formatter("Unexpected Ollama response")
+            throw EchoError.formatter("Unexpected Ollama response")
         }
         return content
     }

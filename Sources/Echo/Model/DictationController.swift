@@ -203,7 +203,7 @@ final class DictationController: ObservableObject {
     private static func waitForModel(_ transcriber: Transcriber) async throws {
         // The model may still be loading on first launch.
         while transcriber.status != .ready {
-            if case .failed(let msg) = transcriber.status { throw MurmurError.formatter(msg) }
+            if case .failed(let msg) = transcriber.status { throw EchoError.formatter(msg) }
             try await Task.sleep(for: .milliseconds(200))
         }
     }

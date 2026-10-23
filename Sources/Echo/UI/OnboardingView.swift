@@ -14,7 +14,7 @@ struct OnboardingView: View {
                     .resizable()
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Set up Murmur").font(.title3.weight(.semibold))
+                    Text("Set up Echo").font(.title3.weight(.semibold))
                     Text("Dictation that runs entirely on this Mac.")
                         .font(.callout).foregroundStyle(.secondary)
                 }

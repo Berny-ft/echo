@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "Murmur",
+    name: "Echo",
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/WhisperKit", from: "1.1.1"),
     ],
     targets: [
         .executableTarget(
-            name: "Murmur",
+            name: "Echo",
             dependencies: [.product(name: "WhisperKit", package: "WhisperKit")],
-            path: "Sources/Murmur",
+            path: "Sources/Echo",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]

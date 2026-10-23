@@ -52,7 +52,7 @@ final class Transcriber: ObservableObject {
 
     static var storageRoot: URL {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Murmur", isDirectory: true)
+            .appendingPathComponent("Echo", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -120,7 +120,7 @@ final class Transcriber: ObservableObject {
 
     /// - Parameter language: ISO code such as "en", or nil to auto-detect.
     func transcribe(_ samples: [Float], language: String?) async throws -> String {
-        guard let kit else { throw MurmurError.modelNotReady }
+        guard let kit else { throw EchoError.modelNotReady }
         let options = DecodingOptions(
             task: .transcribe,
             language: language,
@@ -148,7 +148,7 @@ final class Transcriber: ObservableObject {
     }
 }
 
-enum MurmurError: LocalizedError {
+enum EchoError: LocalizedError {
     case modelNotReady
     case formatter(String)
 
