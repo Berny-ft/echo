@@ -61,3 +61,36 @@ Sources/Echo/
   UI/       MainView (Home/History), StyleView, DictionaryView, SettingsView, Onboarding, Overlay indicator
 scripts/    build_app.sh, make_icon.swift
 ```
+
+## Android
+
+A separate native rewrite in [`android/`](android/) (Kotlin + C++), for Pixel 7 and newer (Android 13+, arm64). Everything runs on the phone.
+
+```
+tap the floating bubble ─► mic (AudioRecord, 16 kHz) in a foreground service ─► pauses > 1 s trimmed, 25 s chunks
+                        ─► Whisper Small.en (whisper.cpp, q5_1) transcribed while you keep talking
+                        ─► cleanup: same rules as the Mac app
+                        ─► optional on-device formatting with Qwen 2.5 (llama.cpp), instructions pre-processed while you speak
+                        ─► typed into the focused field by an accessibility service (or copied if there's no field)
+```
+
+- **Bubble:** draggable, snaps to the screen edge, shows only while a text field is focused (configurable). Tap to start, tap to finish, long-press to open Echo.
+- **Models** download once inside the app: speech (Base.en 60 MB, Small.en 190 MB, Small multilingual, Large v3 Turbo 574 MB) and formatting (Qwen 2.5 0.5B / 1.5B). With no formatting model, Echo does rule-based cleanup only.
+- **Install from an APK:** Android blocks accessibility services for sideloaded apps at first. If it says the setting is restricted, open App info → ⋮ → *Allow restricted settings*, then enable Echo in Accessibility.
+
+Build (needs JDK 21+, Android SDK 36 and NDK 27.2; the native engines are downloaded by CMake):
+
+```bash
+cd android
+./gradlew assembleRelease   # app/build/outputs/apk/release/app-release.apk
+```
+
+Release signing reads `android/keystore.properties` (not committed). Without it, the release APK is built unsigned.
+
+Pipeline check on a device with a WAV file (16 kHz mono):
+
+```bash
+adb push t.wav /sdcard/Android/data/com.echo.dictation/files/t.wav
+adb shell am start -n com.echo.dictation/.ui.MainActivity --es selftest /sdcard/Android/data/com.echo.dictation/files/t.wav
+adb logcat -s EchoSelfTest EchoWhisper EchoLLM
+```

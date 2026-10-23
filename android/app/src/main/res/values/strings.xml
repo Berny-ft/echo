@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Echo</string>
+    <string name="accessibility_label">Echo dictation</string>
+    <string name="accessibility_description">Lets Echo type your dictated text into the field you\'re editing and know which app you\'re in so it can format for it. Echo doesn\'t read or store anything else on screen.</string>
+</resources>
