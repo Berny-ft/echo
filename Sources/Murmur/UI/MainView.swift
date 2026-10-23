@@ -17,9 +17,9 @@ enum Pane: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: "house"
-        case .history: "clock.arrow.circlepath"
+        case .history: "clock"
         case .style: "textformat"
-        case .dictionary: "character.book.closed"
+        case .dictionary: "book.closed"
         case .settings: "gearshape"
         }
     }
@@ -28,7 +28,7 @@ enum Pane: String, CaseIterable, Identifiable {
 struct MainView: View {
     @EnvironmentObject var controller: DictationController
     @EnvironmentObject var prefs: Preferences
-    @State private var pane: Pane = .home
+    @State private var pane: Pane? = .home
     @State private var showOnboarding = false
 
     var body: some View {
@@ -36,27 +36,21 @@ struct MainView: View {
             List(Pane.allCases, selection: $pane) { p in
                 Label(p.title, systemImage: p.symbol).tag(p)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .safeAreaInset(edge: .top) { brand }
-            .safeAreaInset(edge: .bottom) { sidebarStatus }
+            .navigationSplitViewColumnWidth(min: 160, ideal: 176, max: 220)
+            .safeAreaInset(edge: .bottom) { modelStatus }
         } detail: {
-            ScrollView {
-                Group {
-                    switch pane {
-                    case .home: HomeView(pane: $pane)
-                    case .history: HistoryView()
-                    case .style: StyleView()
-                    case .dictionary: DictionaryView()
-                    case .settings: SettingsView(showOnboarding: $showOnboarding)
-                    }
+            Group {
+                switch pane ?? .home {
+                case .home: HomeView(pane: $pane)
+                case .history: HistoryView()
+                case .style: StyleView()
+                case .dictionary: DictionaryView()
+                case .settings: SettingsView(showOnboarding: $showOnboarding)
                 }
-                .padding(28)
-                .frame(maxWidth: 820)
-                .frame(maxWidth: .infinity)
             }
-            .background(.background)
+            .navigationTitle((pane ?? .home).title)
         }
-        .frame(minWidth: 820, minHeight: 580)
+        .frame(minWidth: 680, minHeight: 460)
         .sheet(isPresented: $showOnboarding) {
             OnboardingView { showOnboarding = false; prefs.hasOnboarded = true }
                 .environmentObject(controller)
@@ -71,40 +65,31 @@ struct MainView: View {
         }
     }
 
-    private var brand: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "waveform")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
-                .background(Theme.gradient, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            Text("Murmur").font(.system(size: 17, weight: .bold, design: .rounded))
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-
-    private var sidebarStatus: some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private var modelStatus: some View {
+        let status = controller.transcriber.status
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                StatusDot(color: modelColor)
-                Text(controller.transcriber.status == .ready ? "Speech model ready" : controller.transcriber.status.label)
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Circle()
+                    .fill(status == .ready ? Color.green : status.isFailure ? .red : .orange)
+                    .frame(width: 6, height: 6)
+                Text(status == .ready ? "Model ready" : status.label)
+                    .lineLimit(1)
             }
-            if case .downloading(let p) = controller.transcriber.status {
-                ProgressView(value: p).progressViewStyle(.linear).tint(Theme.accent)
+            if case .downloading(let p) = status {
+                ProgressView(value: p).controlSize(.small)
             }
         }
-        .padding(14)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
+}
 
-    private var modelColor: Color {
-        switch controller.transcriber.status {
-        case .ready: Theme.success
-        case .failed: .red
-        default: Theme.warning
-        }
+extension Transcriber.Status {
+    var isFailure: Bool {
+        if case .failed = self { return true }
+        return false
     }
 }
 
@@ -113,248 +98,224 @@ struct MainView: View {
 struct HomeView: View {
     @EnvironmentObject var controller: DictationController
     @EnvironmentObject var prefs: Preferences
-    @Binding var pane: Pane
+    @Binding var pane: Pane?
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            hero
-            if !controller.micAuthorized || !controller.accessibilityTrusted { permissionBanner }
-            stats
-            recent
-        }
-    }
-
-    private var hero: some View {
-        HStack(spacing: 24) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(greeting).font(.system(size: 30, weight: .bold, design: .rounded))
-                HStack(spacing: 6) {
-                    Text("Hold").foregroundStyle(.secondary)
-                    KeyCap(label: prefs.hotkey.short)
-                    Text("and speak. Tap it once for hands-free.").foregroundStyle(.secondary)
-                }
-                .font(.callout)
-                HStack(spacing: 8) {
-                    chip(prefs.style.title, symbol: prefs.style.symbol) { pane = .style }
-                    chip(prefs.engine.title, symbol: "cpu") { pane = .settings }
-                }
-                .padding(.top, 4)
-            }
-            Spacer()
-            MicButton()
-        }
-        .padding(24)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Theme.gradient.opacity(0.10))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.accent.opacity(0.18)))
-        }
-    }
-
-    private func chip(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol)
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(.background, in: Capsule())
-                .overlay(Capsule().strokeBorder(.separator))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var greeting: String {
-        let h = Calendar.current.component(.hour, from: Date())
-        return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
-    }
-
-    private var permissionBanner: some View {
-        Card {
-            HStack(spacing: 14) {
-                Image(systemName: "lock.shield").font(.title2).foregroundStyle(Theme.warning)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Finish setup").font(.headline)
-                    Text(!controller.micAuthorized
-                         ? "Murmur needs microphone access to hear you."
-                         : "Grant Accessibility so Murmur can use your hotkey anywhere and paste for you.")
-                        .font(.callout).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(!controller.micAuthorized ? "Allow Microphone" : "Open Accessibility") {
-                    if !controller.micAuthorized { controller.requestMicrophone() } else { controller.requestAccessibility() }
-                }
-                .buttonStyle(.borderedProminent).tint(Theme.accent)
-            }
-        }
-    }
-
-    private var stats: some View {
-        HStack(spacing: 14) {
-            StatTile(value: "\(controller.history.totalWords)", label: "Words dictated", symbol: "text.word.spacing")
-            StatTile(value: "\(controller.history.averageWPM)", label: "Avg. words / min", symbol: "speedometer")
-            StatTile(value: "\(controller.history.minutesSaved)m", label: "Time saved", symbol: "hourglass")
-            StatTile(value: "\(controller.history.streak)", label: "Day streak", symbol: "flame")
-        }
-    }
-
-    private var recent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Recent").font(.title3.weight(.semibold))
-                Spacer()
-                if !controller.history.items.isEmpty {
-                    Button("See all") { pane = .history }.buttonStyle(.link)
-                }
-            }
-            if controller.history.items.isEmpty {
-                Card {
-                    VStack(spacing: 10) {
-                        Image(systemName: "waveform.badge.mic").font(.system(size: 34)).foregroundStyle(Theme.gradient)
-                        Text("Your dictations will show up here").font(.headline)
-                        Text("Click into any text field, hold \(prefs.hotkey.short), and talk naturally. Murmur cleans it up and pastes it for you.")
-                            .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                }
-            } else {
-                ForEach(controller.history.items.prefix(4)) { item in
-                    DictationRow(item: item)
-                }
-            }
-        }
-    }
-}
-
-struct StatTile: View {
-    let value: String
-    let label: String
-    let symbol: String
-
-    var body: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: symbol).foregroundStyle(Theme.gradient).font(.system(size: 15, weight: .semibold))
-                Text(value).font(.system(size: 24, weight: .bold, design: .rounded)).contentTransition(.numericText())
-                Text(label).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
-struct MicButton: View {
-    @EnvironmentObject var controller: DictationController
-    @State private var hover = false
-
-    private var recording: Bool {
+    private var isRecording: Bool {
         if case .recording = controller.phase { return true }
         return false
     }
 
     var body: some View {
-        Button { controller.toggleFromUI() } label: {
-            ZStack {
-                Circle()
-                    .fill(Theme.gradient)
-                    .frame(width: 84, height: 84)
-                    .shadow(color: Theme.accent.opacity(hover ? 0.55 : 0.35), radius: hover ? 18 : 12, y: 6)
-                if recording {
-                    Waveform(levels: Array(controller.levels.suffix(9)), barWidth: 4, spacing: 3, maxHeight: 30)
-                } else if controller.phase == .transcribing || controller.phase == .formatting {
-                    ProgressView().controlSize(.regular).tint(.white)
-                } else {
-                    Image(systemName: "mic.fill").font(.system(size: 30, weight: .semibold)).foregroundStyle(.white)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                header
+                if !controller.micAuthorized || !controller.accessibilityTrusted { permissionNotice }
+                stats
+                recent
+            }
+            .padding(24)
+            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(statusTitle)
+                    .font(.title2.weight(.semibold))
+                HStack(spacing: 4) {
+                    Text("Hold")
+                    KeyCap(label: prefs.hotkey.short)
+                    Text("to dictate. Tap once for hands-free.")
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                Text("\(prefs.style.title) style · \(prefs.engine.title)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            Button { controller.toggleFromUI() } label: {
+                Label(isRecording ? "Stop" : "Dictate", systemImage: isRecording ? "stop.fill" : "mic")
+                    .frame(minWidth: 72)
+            }
+            .controlSize(.large)
+            .disabled(controller.phase == .transcribing || controller.phase == .formatting)
+        }
+    }
+
+    private var statusTitle: String {
+        switch controller.phase {
+        case .recording: return "Listening…"
+        case .transcribing: return "Transcribing…"
+        case .formatting: return "Formatting…"
+        default:
+            switch controller.transcriber.status {
+            case .ready: return "Ready"
+            case .failed: return "Speech model failed to load"
+            default: return "Preparing speech model…"
+            }
+        }
+    }
+
+    private var permissionNotice: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            Text(!controller.micAuthorized
+                 ? "Microphone access is required to dictate."
+                 : "Grant Accessibility access to use the shortcut in other apps and paste automatically.")
+                .font(.callout)
+            Spacer()
+            Button(!controller.micAuthorized ? "Allow…" : "Open Settings…") {
+                if !controller.micAuthorized { controller.requestMicrophone() } else { controller.requestAccessibility() }
+            }
+        }
+        .padding(12)
+        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var stats: some View {
+        GroupBox {
+            HStack(spacing: 0) {
+                stat("\(controller.history.totalWords.formatted())", "Words")
+                Divider().frame(height: 30)
+                stat("\(controller.history.averageWPM)", "Words per minute")
+                Divider().frame(height: 30)
+                stat("\(controller.history.minutesSaved) min", "Time saved")
+                Divider().frame(height: 30)
+                stat("\(controller.history.todayCount)", "Today")
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.title3.weight(.semibold)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+    }
+
+    private var recent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Recent").font(.headline)
+                Spacer()
+                if !controller.history.items.isEmpty {
+                    Button("Show All") { pane = .history }
+                        .buttonStyle(.link)
+                        .font(.callout)
                 }
             }
-            .scaleEffect(hover ? 1.04 : 1)
-            .animation(.spring(response: 0.3), value: hover)
+            if controller.history.items.isEmpty {
+                Text("Dictations appear here. Click into any text field, hold \(prefs.hotkey.short), and speak.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                GroupBox {
+                    VStack(spacing: 0) {
+                        let items = Array(controller.history.items.prefix(5))
+                        ForEach(items) { item in
+                            DictationRow(item: item)
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 4)
+                            if item.id != items.last?.id { Divider() }
+                        }
+                    }
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .help(recording ? "Finish dictation" : "Start a hands-free dictation (copies to clipboard)")
     }
 }
 
-// MARK: - History
+// MARK: - Dictation row
 
 struct DictationRow: View {
     @EnvironmentObject var controller: DictationController
     let item: Dictation
-    @State private var expanded = false
+    @State private var hovering = false
+    @State private var showOriginal = false
     @State private var copied = false
-    @State private var reformatting = false
-    @State private var override: String?
+    @State private var rewriting = false
+    @State private var rewritten: String?
+
+    private var text: String { rewritten ?? item.formatted }
 
     var body: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Label(item.style.title, systemImage: item.style.symbol)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(Theme.accent)
-                    if let app = item.appName {
-                        Text("· \(app)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(item.date, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.tertiary)
-                }
-                Text(override ?? item.formatted)
-                    .font(.body)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .lineLimit(showOriginal ? nil : 3)
                     .textSelection(.enabled)
-                    .lineLimit(expanded ? nil : 4)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if expanded {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("ORIGINAL TRANSCRIPT").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                Text(rewriting ? "Rewriting…" : item.metaLine)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if showOriginal {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Original transcript").font(.caption.weight(.medium)).foregroundStyle(.secondary)
                         Text(item.raw).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                        Text("\(item.engine) · \(String(format: "%.1fs", item.duration)) · \(item.wordCount) words")
-                            .font(.caption2).foregroundStyle(.tertiary).padding(.top, 2)
+                        Text("\(item.engine) · \(String(format: "%.0fs", item.duration)) of speech · \(item.wordCount) words")
+                            .font(.caption).foregroundStyle(.tertiary)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.top, 4)
                 }
-                HStack(spacing: 14) {
-                    Button { Paster.copy(override ?? item.formatted); flashCopied() } label: {
-                        Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                    }
-                    Menu {
-                        ForEach(FormatStyle.allCases.filter { $0 != .smart }) { style in
-                            Button { reformat(style) } label: { Label(style.title, systemImage: style.symbol) }
-                        }
-                    } label: {
-                        Label(reformatting ? "Rewriting…" : "Rewrite as", systemImage: "wand.and.stars")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .disabled(reformatting)
-                    Button { withAnimation(.snappy) { expanded.toggle() } } label: {
-                        Label(expanded ? "Less" : "Details", systemImage: expanded ? "chevron.up" : "chevron.down")
-                    }
-                    Spacer()
-                    Button(role: .destructive) { controller.history.delete(item) } label: { Image(systemName: "trash") }
-                        .help("Delete")
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
+            HStack(spacing: 2) {
+                Button { copy() } label: {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                }
+                .help("Copy")
+                Menu {
+                    menuItems
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+            .buttonStyle(.borderless)
+            .opacity(hovering || copied ? 1 : 0)
         }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .contextMenu { menuItems }
     }
 
-    private func flashCopied() {
+    @ViewBuilder
+    private var menuItems: some View {
+        Button("Copy") { copy() }
+        Button("Copy Original Transcript") { Paster.copy(item.raw) }
+        Menu("Rewrite As") {
+            ForEach(FormatStyle.allCases.filter { $0 != .smart }) { style in
+                Button(style.title) { rewrite(style) }
+            }
+        }
+        Button(showOriginal ? "Hide Original" : "Show Original") { showOriginal.toggle() }
+        Divider()
+        Button("Delete", role: .destructive) { controller.history.delete(item) }
+    }
+
+    private func copy() {
+        Paster.copy(text)
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
     }
 
-    private func reformat(_ style: FormatStyle) {
-        reformatting = true
+    private func rewrite(_ style: FormatStyle) {
+        rewriting = true
         Task {
-            let text = await controller.reformat(item, style: style)
-            override = text
-            reformatting = false
+            rewritten = await controller.reformat(item, style: style)
+            rewriting = false
         }
     }
 }
+
+// MARK: - History
 
 struct HistoryView: View {
     @EnvironmentObject var controller: DictationController
@@ -369,30 +330,32 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .bottom) {
-                SectionHeader(title: "History", subtitle: "\(controller.history.items.count) dictations, stored only on this Mac.")
-                Spacer()
-                if !controller.history.items.isEmpty {
-                    Button("Clear all", role: .destructive) { confirmClear = true }
-                }
-            }
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search dictations", text: $query).textFieldStyle(.plain)
-            }
-            .padding(10)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
-
-            if filtered.isEmpty {
-                Text(query.isEmpty ? "Nothing yet." : "No matches.").foregroundStyle(.secondary).padding(.top, 20)
-            }
-            LazyVStack(spacing: 10) {
-                ForEach(filtered) { DictationRow(item: $0) }
+        List {
+            ForEach(filtered) { item in
+                DictationRow(item: item).padding(.vertical, 4)
             }
         }
-        .confirmationDialog("Delete all history?", isPresented: $confirmClear) {
-            Button("Delete All", role: .destructive) { controller.history.clear() }
+        .listStyle(.inset)
+        .overlay {
+            if filtered.isEmpty {
+                ContentUnavailableView(
+                    query.isEmpty ? "No Dictations" : "No Results",
+                    systemImage: query.isEmpty ? "waveform" : "magnifyingglass",
+                    description: Text(query.isEmpty ? "Everything you dictate is kept here, on this Mac only." : "Try a different search.")
+                )
+            }
+        }
+        .searchable(text: $query, placement: .toolbar, prompt: "Search")
+        .toolbar {
+            ToolbarItem {
+                Button("Clear History", systemImage: "trash") { confirmClear = true }
+                    .disabled(controller.history.items.isEmpty)
+            }
+        }
+        .confirmationDialog("Clear all history?", isPresented: $confirmClear) {
+            Button("Clear History", role: .destructive) { controller.history.clear() }
+        } message: {
+            Text("This can't be undone.")
         }
     }
 }

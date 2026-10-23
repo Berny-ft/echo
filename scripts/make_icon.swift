@@ -26,14 +26,10 @@ func render(_ px: Int) -> Data {
     NSGraphicsContext.restoreGraphicsState()
 
     let gradient = NSGradient(colors: [
-        NSColor(red: 0.40, green: 0.33, blue: 0.96, alpha: 1),
-        NSColor(red: 0.86, green: 0.38, blue: 0.82, alpha: 1),
+        NSColor(white: 0.24, alpha: 1),
+        NSColor(white: 0.09, alpha: 1),
     ])!
-    gradient.draw(in: path, angle: -45)
-
-    // Soft top highlight.
-    let highlight = NSGradient(colors: [NSColor.white.withAlphaComponent(0.22), NSColor.white.withAlphaComponent(0)])!
-    highlight.draw(in: path, angle: -90)
+    gradient.draw(in: path, angle: -90)
 
     // Waveform bars.
     let heights: [CGFloat] = [0.22, 0.42, 0.66, 0.42, 0.82, 0.52, 0.30]

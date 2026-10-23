@@ -45,6 +45,9 @@ final class DictationController: ObservableObject {
     private var resetWork: DispatchWorkItem?
     private var sessionID = UUID()
     private var permissionPoll: Timer?
+    private var chunkTasks: [Task<String, Error>] = []
+    private var sessionLanguage: String?
+    static let chunkSeconds: TimeInterval = 60
 
     init() {
         recorder.onLevel = { [weak self] level in
@@ -134,16 +137,18 @@ final class DictationController: ObservableObject {
         refreshPermissions()
         guard micAuthorized else {
             requestMicrophone()
-            show(.error("Allow microphone access to dictate"))
+            show(.error("Microphone access needed"))
             hotkeys.reset()
             return
         }
 
         resetWork?.cancel()
         sessionID = UUID()
+        chunkTasks.removeAll()
         let front = NSWorkspace.shared.frontmostApplication
         targetApp = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front
         targetAppName = targetApp?.localizedName
+        sessionLanguage = prefs.language == "auto" ? nil : prefs.language
 
         do {
             try recorder.start()
@@ -177,14 +182,38 @@ final class DictationController: ObservableObject {
         next.append(CGFloat(level))
         levels = next
         if let startedAt { elapsed = Date().timeIntervalSince(startedAt) }
-        // Safety cap: Whisper handles long audio, but keep sessions bounded.
-        if elapsed > 600 { finishRecording() }
+        // Transcribe each finished minute in the background while the user keeps talking.
+        if let chunk = recorder.takeChunk(seconds: Self.chunkSeconds) {
+            enqueueChunk(chunk)
+        }
+    }
+
+    /// Transcribes chunks strictly in order, one at a time.
+    private func enqueueChunk(_ samples: [Float]) {
+        let previous = chunkTasks.last
+        let language = sessionLanguage
+        let task = Task<String, Error> { @MainActor [transcriber] in
+            _ = try? await previous?.value
+            try await Self.waitForModel(transcriber)
+            return try await transcriber.transcribe(samples, language: language)
+        }
+        chunkTasks.append(task)
+    }
+
+    private static func waitForModel(_ transcriber: Transcriber) async throws {
+        // The model may still be loading on first launch.
+        while transcriber.status != .ready {
+            if case .failed(let msg) = transcriber.status { throw MurmurError.formatter(msg) }
+            try await Task.sleep(for: .milliseconds(200))
+        }
     }
 
     func cancel() {
         guard case .recording = phase else { return }
         timer?.invalidate()
         _ = recorder.stop()
+        chunkTasks.forEach { $0.cancel() }
+        chunkTasks.removeAll()
         hotkeys.reset()
         phase = .idle
         OverlayController.shared.hide()
@@ -195,37 +224,42 @@ final class DictationController: ObservableObject {
         timer?.invalidate()
         hotkeys.reset()
         let (samples, peak) = recorder.stop()
-        let duration = Double(samples.count) / AudioRecorder.sampleRate
+        let speechDuration = recorder.stats.kept
         if prefs.playSounds { NSSound(named: "Pop")?.play() }
 
-        // Ignore accidental taps and silence — Whisper hallucinates on empty audio.
-        guard duration > 0.4, peak > 0.008 else {
-            show(.error(duration <= 0.4 ? "Too short — hold to talk" : "Didn't catch anything"))
+        // Ignore accidental taps and silence; Whisper hallucinates on empty audio.
+        guard speechDuration > 0.4, peak > 0.008 else {
+            chunkTasks.forEach { $0.cancel() }
+            chunkTasks.removeAll()
+            show(.error(speechDuration <= 0.4 ? "Too short" : "No speech detected"))
             return
+        }
+        if Double(samples.count) / AudioRecorder.sampleRate > 0.3 {
+            enqueueChunk(samples)
         }
 
         phase = .transcribing
         let id = sessionID
         let target = targetApp
+        let tasks = chunkTasks
+        chunkTasks.removeAll()
         Task {
-            await process(samples: samples, duration: duration, target: target, id: id)
+            await process(chunks: tasks, duration: speechDuration, target: target, id: id)
         }
     }
 
-    private func process(samples: [Float], duration: TimeInterval, target: NSRunningApplication?, id: UUID) async {
+    private func process(chunks: [Task<String, Error>], duration: TimeInterval,
+                         target: NSRunningApplication?, id: UUID) async {
         do {
-            if transcriber.status != .ready {
-                // Wait for the model to finish loading (first launch).
-                for _ in 0..<600 where transcriber.status != .ready {
-                    if case .failed = transcriber.status { break }
-                    try await Task.sleep(for: .milliseconds(200))
-                }
+            var parts: [String] = []
+            for chunk in chunks {
+                let text = try await chunk.value
+                if !text.isEmpty { parts.append(text) }
             }
-            let language = prefs.language == "auto" ? nil : prefs.language
-            let raw = try await transcriber.transcribe(samples, language: language)
+            let raw = parts.joined(separator: " ")
             guard id == sessionID else { return }
             guard !raw.isEmpty else {
-                show(.error("Didn't catch anything"))
+                show(.error("No speech detected"))
                 return
             }
 

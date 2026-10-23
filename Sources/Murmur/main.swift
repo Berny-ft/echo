@@ -10,6 +10,13 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--selftest" {
         exit(0)
     }
     RunLoop.main.run()
+} else if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--chunktest" {
+    let path = CommandLine.arguments[2]
+    Task { @MainActor in
+        await SelfTest.chunkTest(audioPath: path)
+        exit(0)
+    }
+    RunLoop.main.run()
 } else {
     MurmurApp.main()
 }
@@ -41,6 +48,51 @@ enum SelfTest {
                 print(String(format: "\n── %@ / %@ [%@] (%.2fs)\n%@", engine.title, style.title, out.engineUsed, Date().timeIntervalSince(t2), out.text))
             }
         }
+    }
+
+    /// Simulates a long session: speech separated by long and short pauses, fed through the
+    /// recorder's silence trimming and one-minute chunking, then transcribed chunk by chunk.
+    static func chunkTest(audioPath: String) async {
+        guard let speech = loadSamples(audioPath) else { print("Could not read audio"); return }
+        func quiet(_ seconds: Double) -> [Float] {
+            (0..<Int(seconds * 16_000)).map { _ in Float.random(in: -0.001...0.001) } // room noise, inaudible
+        }
+        var session: [Float] = []
+        for i in 0..<6 { session += speech + quiet(i % 2 == 0 ? 12 : 3) }
+        print(String(format: "Session: %.1fs total (6 × %.1fs speech, alternating 12s / 3s pauses)",
+                     Double(session.count) / 16_000, Double(speech.count) / 16_000))
+
+        let recorder = AudioRecorder()
+        var chunks: [[Float]] = []
+        var i = 0
+        while i < session.count {
+            let end = min(i + 1600, session.count) // 100 ms blocks, like the mic tap
+            recorder.ingest(Array(session[i..<end]))
+            i = end
+            if let c = recorder.takeChunk(seconds: 60) { chunks.append(c) }
+        }
+        let final = recorder.stop().samples
+        chunks.append(final)
+        let stats = recorder.stats
+        print(String(format: "Kept %.1fs, cut %.1fs of silence. Expected cut: 3 × (12 − 1.2) = 32.4s", stats.kept, stats.cut))
+        print("Chunks: " + chunks.map { String(format: "%.1fs", Double($0.count) / 16_000) }.joined(separator: ", "))
+
+        let transcriber = Transcriber()
+        transcriber.load(model: Preferences.shared.whisperModel)
+        while transcriber.status != .ready {
+            if case .failed(let msg) = transcriber.status { print("FAILED: \(msg)"); return }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        var parts: [String] = []
+        for (n, c) in chunks.enumerated() {
+            let t = Date()
+            let text = (try? await transcriber.transcribe(c, language: "en")) ?? "<error>"
+            print(String(format: "\n[chunk %d, %.1fs audio → %.2fs] %@", n + 1, Double(c.count) / 16_000, Date().timeIntervalSince(t), text))
+            parts.append(text)
+        }
+        let joined = parts.joined(separator: " ").lowercased()
+        let count = joined.components(separatedBy: "let me know if you have any questions").count - 1
+        print("\nFull sentence 'let me know if you have any questions' found \(count)/6 times")
     }
 
     static func loadSamples(_ path: String) -> [Float]? {

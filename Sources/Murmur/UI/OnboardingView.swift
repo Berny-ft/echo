@@ -8,98 +8,88 @@ struct OnboardingView: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(spacing: 22) {
-            VStack(spacing: 10) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 64, height: 64)
-                    .background(Theme.gradient, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: Theme.accent.opacity(0.4), radius: 12, y: 6)
-                Text("Welcome to Murmur").font(.system(size: 26, weight: .bold, design: .rounded))
-                Text("Speak naturally. Get clean, formatted text wherever you type. 100% on-device.")
-                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Set up Murmur").font(.title3.weight(.semibold))
+                    Text("Dictation that runs entirely on this Mac.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
             }
 
-            VStack(spacing: 10) {
-                step(1, title: "Microphone", detail: "So Murmur can hear you.", done: controller.micAuthorized) {
-                    controller.requestMicrophone()
+            GroupBox {
+                VStack(spacing: 0) {
+                    row("Microphone", detail: "Required to hear you.", done: controller.micAuthorized) {
+                        controller.requestMicrophone()
+                    }
+                    Divider()
+                    row("Accessibility", detail: "For the shortcut in any app and automatic pasting.",
+                        done: controller.accessibilityTrusted) {
+                        controller.requestAccessibility()
+                    }
+                    Divider()
+                    modelRow
                 }
-                step(2, title: "Accessibility", detail: "For the hotkey in every app, and pasting for you.",
-                     done: controller.accessibilityTrusted) {
-                    controller.requestAccessibility()
-                }
-                modelStep
             }
 
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    Text("Then hold").foregroundStyle(.secondary)
-                    KeyCap(label: prefs.hotkey.short)
-                    Text("anywhere and start talking.").foregroundStyle(.secondary)
-                }
-                .font(.callout)
+            HStack(spacing: 4) {
+                Text("Then hold")
+                KeyCap(label: prefs.hotkey.short)
+                Text("in any app and start speaking.")
             }
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
-            Button(action: onDone) {
-                Text(controller.micAuthorized ? "Start dictating" : "Skip for now")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+            HStack {
+                Spacer()
+                Button(controller.micAuthorized ? "Done" : "Later", action: onDone)
+                    .keyboardShortcut(.defaultAction)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
-            .controlSize(.large)
         }
-        .padding(32)
-        .frame(width: 480)
+        .padding(20)
+        .frame(width: 440)
         .onReceive(timer) { _ in controller.refreshPermissions() }
     }
 
-    private var modelStep: some View {
+    private var modelRow: some View {
         let status = controller.transcriber.status
-        return HStack(spacing: 14) {
-            badge(3, done: status == .ready)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Speech model").fontWeight(.semibold)
+        return HStack(spacing: 10) {
+            statusIcon(done: status == .ready)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Speech model")
                 if case .downloading(let p) = status {
-                    ProgressView(value: p).tint(Theme.accent)
-                    Text("Downloading Whisper once (\(Int(p * 100))%)…").font(.caption).foregroundStyle(.secondary)
+                    ProgressView(value: p).controlSize(.small)
+                    Text("Downloading Whisper (one time)… \(Int(p * 100))%")
+                        .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text(status == .ready ? "Whisper is loaded and ready." : status.label)
+                    Text(status == .ready ? "Whisper is ready." : status.label)
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
         }
-        .padding(12)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+        .padding(8)
     }
 
-    private func step(_ n: Int, title: String, detail: String, done: Bool, action: @escaping () -> Void) -> some View {
-        HStack(spacing: 14) {
-            badge(n, done: done)
+    private func row(_ title: String, detail: String, done: Bool, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            statusIcon(done: done)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).fontWeight(.semibold)
+                Text(title)
                 Text(detail).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if !done {
-                Button("Allow", action: action).buttonStyle(.bordered)
-            }
+            if !done { Button("Allow…", action: action) }
         }
-        .padding(12)
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 12))
+        .padding(8)
     }
 
-    private func badge(_ n: Int, done: Bool) -> some View {
-        ZStack {
-            Circle().fill(done ? AnyShapeStyle(Theme.success) : AnyShapeStyle(Theme.accent.opacity(0.15)))
-                .frame(width: 30, height: 30)
-            if done {
-                Image(systemName: "checkmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
-            } else {
-                Text("\(n)").font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Theme.accent)
-            }
-        }
+    private func statusIcon(done: Bool) -> some View {
+        Image(systemName: done ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(done ? Color.green : Color.secondary)
+            .font(.system(size: 15))
     }
 }

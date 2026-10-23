@@ -6,13 +6,15 @@ Hold a key, speak naturally, release: Murmur transcribes you, cleans up and orga
 ## How it works
 
 ```
-hold Right ⌥ ─► mic (AVAudioEngine, 16 kHz) ─► Whisper Large v3 Turbo (WhisperKit, Neural Engine)
+hold Right ⌥ ─► mic (AVAudioEngine, 16 kHz) ─► cut pauses > 5 s ─► 1-minute chunks
+            ─► Whisper Large v3 Turbo (WhisperKit, Neural Engine), transcribed while you keep talking
             ─► cleanup: fillers, stutters, "no wait, actually…" corrections, "new line"
             ─► LLM formatting (Apple Intelligence on-device model, or Ollama)
             ─► paste with ⌘V into the app you were in (clipboard restored afterwards)
 ```
 
 - **Speech to text:** OpenAI Whisper via [WhisperKit](https://github.com/argmaxinc/WhisperKit). Large v3 Turbo by default (632 MB, downloaded once to `~/Library/Application Support/Murmur`). Small.en and Base.en are also available.
+- **Long dictations:** no time limit. Every minute of audio is transcribed in the background while you keep talking (split at the quietest moment, so no word is cut), so stopping only waits for the last partial minute. Silences over 5 s with no audible sound are cut down to short pads before transcription.
 - **Formatting:** Apple's on-device foundation model (default), any Ollama model (e.g. `gemma3:4b`), or rules only. LLM output that looks like the model answered the text instead of formatting it is discarded, and Murmur falls back to the rule-based cleanup.
 - **Styles:** Smart (adapts to the target app: Email in Mail, Message in Slack/Messages), Clean, Polished, Notes (bullets), Email, Message.
 - **Dictionary:** custom vocabulary plus spoken → written replacements ("my email" → `me@example.com`).
@@ -45,7 +47,8 @@ Headless pipeline check, without the mic:
 
 ```bash
 say -o /tmp/t.aiff "um so we should ship on thursday no wait friday"
-build/Murmur.app/Contents/MacOS/Murmur --selftest /tmp/t.aiff
+build/Murmur.app/Contents/MacOS/Murmur --selftest /tmp/t.aiff   # transcribe + every formatter
+build/Murmur.app/Contents/MacOS/Murmur --chunktest /tmp/t.aiff  # 2.5 min session with pauses: silence cutting + chunking
 ```
 
 ## Layout
@@ -54,6 +57,6 @@ build/Murmur.app/Contents/MacOS/Murmur --selftest /tmp/t.aiff
 Sources/Murmur/
   Engine/   AudioRecorder, Transcriber (WhisperKit), TextFormatter (cleanup + LLM), HotkeyMonitor, Paster
   Model/    DictationController (pipeline state machine), Preferences, HistoryStore
-  UI/       MainView (Home/History), Style & Dictionary, Settings, Onboarding, floating Overlay pill
+  UI/       MainView (Home/History), StyleView, DictionaryView, SettingsView, Onboarding, Overlay indicator
 scripts/    build_app.sh, make_icon.swift
 ```
