@@ -320,6 +320,13 @@ final class DictationController: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + (phase == .done("Pasted") ? 1.0 : 2.2), execute: work)
     }
 
+    /// Puts the controller into a given visual state; used by the overlay self-test.
+    func preview(phase: Phase, levels: [CGFloat], elapsed: TimeInterval) {
+        self.phase = phase
+        self.levels = levels
+        self.elapsed = elapsed
+    }
+
     /// Re-run formatting on a history item with a different style.
     func reformat(_ item: Dictation, style: FormatStyle) async -> String {
         let context = TextFormatter.Context(style: style, appName: nil, bundleID: nil,

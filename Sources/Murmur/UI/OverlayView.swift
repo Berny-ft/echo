@@ -106,10 +106,10 @@ struct OverlayView: View {
                 .help("Finish dictation")
             }
         case .transcribing:
-            ProgressView().controlSize(.mini)
+            Spinner()
             Text("Transcribing")
         case .formatting:
-            ProgressView().controlSize(.mini)
+            Spinner()
             Text("Formatting")
         case .done(let message):
             Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
@@ -126,5 +126,19 @@ struct OverlayView: View {
         let s = Int(t)
         return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
                          : String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+/// Small indeterminate spinner drawn in SwiftUI, so it renders the same everywhere.
+struct Spinner: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let angle = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) * 360
+            Circle()
+                .trim(from: 0.15, to: 0.85)
+                .stroke(.white.opacity(0.85), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                .rotationEffect(.degrees(angle))
+        }
+        .frame(width: 11, height: 11)
     }
 }

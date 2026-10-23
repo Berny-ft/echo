@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import AVFoundation
 import Foundation
 
@@ -17,6 +18,9 @@ if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--selftest" {
         exit(0)
     }
     RunLoop.main.run()
+} else if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--overlaytest" {
+    let dir = URL(fileURLWithPath: CommandLine.arguments[2])
+    MainActor.assumeIsolated { SelfTest.renderOverlay(to: dir) }
 } else {
     MurmurApp.main()
 }
@@ -93,6 +97,36 @@ enum SelfTest {
         let joined = parts.joined(separator: " ").lowercased()
         let count = joined.components(separatedBy: "let me know if you have any questions").count - 1
         print("\nFull sentence 'let me know if you have any questions' found \(count)/6 times")
+    }
+
+    /// Renders the recording indicator in each state to PNGs, without needing a microphone.
+    static func renderOverlay(to dir: URL) {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let controller = DictationController()
+        let wave: [CGFloat] = (0..<28).map { i in CGFloat(0.25 + 0.6 * abs(sin(Double(i) * 0.7))) }
+        let states: [(String, DictationController.Phase, TimeInterval)] = [
+            ("1-recording", .recording(handsFree: false), 7),
+            ("2-handsfree", .recording(handsFree: true), 754),
+            ("3-transcribing", .transcribing, 0),
+            ("4-formatting", .formatting, 0),
+            ("5-done", .done("Pasted"), 0),
+            ("6-error", .error("No speech detected"), 0),
+        ]
+        for (name, phase, elapsed) in states {
+            controller.preview(phase: phase, levels: wave, elapsed: elapsed)
+            let view = OverlayView()
+                .environmentObject(controller)
+                .frame(width: 260, height: 44)
+                .background(Color(white: 0.85))
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            if let image = renderer.nsImage,
+               let tiff = image.tiffRepresentation,
+               let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                try? png.write(to: dir.appendingPathComponent("\(name).png"))
+                print("wrote \(name).png")
+            }
+        }
     }
 
     static func loadSamples(_ path: String) -> [Float]? {

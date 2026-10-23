@@ -49,6 +49,7 @@ Headless pipeline check, without the mic:
 say -o /tmp/t.aiff "um so we should ship on thursday no wait friday"
 build/Murmur.app/Contents/MacOS/Murmur --selftest /tmp/t.aiff   # transcribe + every formatter
 build/Murmur.app/Contents/MacOS/Murmur --chunktest /tmp/t.aiff  # 2.5 min session with pauses: silence cutting + chunking
+build/Murmur.app/Contents/MacOS/Murmur --overlaytest /tmp/overlay   # renders the recording indicator in every state
 ```
 
 ## Layout
